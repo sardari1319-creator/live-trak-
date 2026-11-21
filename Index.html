@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="pa">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Live Location Tracker</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body { background: #0b1120; color: #f8fafc; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+    .topbar {
+      background: #111827; padding: 10px 12px; border-bottom: 1px solid #1f2937;
+      display: flex; align-items: center; justify-content: space-between; gap: 6px; z-index: 1000; flex-wrap: wrap;
+    }
+    .brand { font-weight: 700; font-size: 14px; color: #38bdf8; white-space: nowrap; }
+    .top-controls { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+    .my-code-box {
+      background: #1e293b; border: 1px solid #334155; padding: 5px 8px;
+      border-radius: 8px; font-size: 12px; display: flex; align-items: center; gap: 5px;
+    }
+    .my-code-val { color: #4ade80; font-weight: 700; letter-spacing: 1px; }
+
+    .lang-select {
+      background: #1e293b; color: #f8fafc; border: 1px solid #334155;
+      border-radius: 8px; padding: 6px 8px; font-size: 12px; font-weight: 600; outline: none; cursor: pointer;
+    }
+
+    .btn {
+      background: #2563eb; color: #fff; border: none; border-radius: 8px;
+      padding: 7px 10px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn-ghost { background: #1f2937; color: #e5e7eb; border: 1px solid #374151; }
+    .btn-danger { background: #7f1d1d; color: #fecaca; border: 1px solid #991b1b; }
+
+    .pair-bar {
+      background: #0f172a; padding: 10px 12px; border-bottom: 1px solid #1e293b;
+      display: flex; gap: 8px; align-items: center; z-index: 999;
+    }
+    .pair-input {
+      flex: 1; background: #1e293b; border: 1px solid #334155; color: #fff;
+      padding: 8px 10px; border-radius: 8px; font-size: 13px; outline: none; text-transform: uppercase;
+    }
+
+    #map { flex: 1; width: 100%; z-index: 1; }
+
+    .status-msg {
+      background: #111827; color: #94a3b8; font-size: 12px;
+      padding: 6px 12px; border-top: 1px solid #1f2937;
+    }
+
+    .drawer {
+      background: #111827; border-top: 1px solid #1f2937; max-height: 30vh;
+      overflow-y: auto; padding: 10px 12px; z-index: 1000;
+    }
+    .drawer-title { font-size: 12px; color: #9ca3af; margin-bottom: 8px; font-weight: 600; }
+    .user-card {
+      background: #1e293b; border: 1px solid #334155; border-radius: 10px;
+      padding: 10px 12px; margin-bottom: 8px; display: flex;
+      justify-content: space-between; align-items: center; gap: 10px; cursor: pointer;
+    }
+    .user-meta small { color: #94a3b8; display: block; margin-top: 2px; }
+    .speed-badge {
+      background: rgba(56, 189, 248, 0.15); color: #38bdf8;
+      padding: 4px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">ЁЯУН LiveTrack</div>
+    <div class="top-controls">
+      <div class="my-code-box">
+        <span id="myCodeLabel">риорйЗри░ри╛ риХрйЛриб:</span>
+        <span id="myCode" class="my-code-val">------</span>
+      </div>
+
+      <select id="langSelect" class="lang-select" aria-label="Language">
+        <option value="pa">рикрй░риЬри╛римрйА</option>
+        <option value="hi">рд╣рд┐рдиреНрджреА</option>
+        <option value="en">English</option>
+      </select>
+
+      <button id="mapToggleBtn" class="btn btn-ghost" type="button">ЁЯЫ░я╕П ри╕рйИриЯрйЗри▓ри╛риИриЯ</button>
+      <button id="logoutBtn" class="btn btn-danger" type="button">ри▓рйМриЧ риЖриКриЯ</button>
+    </div>
+  </div>
+
+  <div class="pair-bar">
+    <input id="friendCodeInput" class="pair-input" type="text" placeholder="рижрйЛри╕рид рижри╛ риХрйЛриб ринри░рйЛ (риЬри┐ри╡рйЗриВ AB12CD)" maxlength="12" />
+    <button id="connectBtn" class="btn" type="button">риЬрйЛрйЬрйЛ</button>
+  </div>
+
+  <div id="map"></div>
+  <div id="statusMsg" class="status-msg">ри▓рйЛриХрйЗри╕ри╝рии ри╕рйЗри╡ри╛ риЪри╛ри▓рйВ риХрйАридрйА риЬри╛ ри░ри╣рйА ри╣рйИ...</div>
+
+  <div class="drawer">
+    <div id="drawerTitle" class="drawer-title">риЬрйБрйЬрйЗ ри╣рйЛриП рипрйВриЬри╝ри░ри╛риВ рижрйА ри▓ри╛риИри╡ ри▓рйЛриХрйЗри╕ри╝рии</div>
+    <div id="userList"></div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getDatabase, ref, set, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+    const translations = {
+      pa: {
+        htmlLang: "pa",
+        myCodeLabel: "риорйЗри░ри╛ риХрйЛриб:",
+        satelliteBtn: "ЁЯЫ░я╕П ри╕рйИриЯрйЗри▓ри╛риИриЯ",
+        streetBtn: "ЁЯЧ║я╕П риириХри╕ри╝ри╛",
+        logoutBtn: "ри▓рйМриЧ риЖриКриЯ",
+        logoutConfirm: "риХрйА ридрйБри╕рйАриВ ри▓рйМриЧ риЖриКриЯ риХри░риХрйЗ риири╡ри╛риВ риХрйЛриб римригри╛риЙригри╛ риЪри╛ри╣рйБрй░рижрйЗ ри╣рйЛ?",
+        friendPlaceholder: "рижрйЛри╕рид рижри╛ риХрйЛриб ринри░рйЛ (риЬри┐ри╡рйЗриВ AB12CD)",
+        connectBtn: "риЬрйЛрйЬрйЛ",
+        drawerTitle: "риЬрйБрйЬрйЗ ри╣рйЛриП рипрйВриЬри╝ри░ри╛риВ рижрйА ри▓ри╛риИри╡ ри▓рйЛриХрйЗри╕ри╝рии",
+        noUsers: "риХрйЛриИ риЬрйБрйЬрйА ри╣рйЛриИ ри▓рйЛриХрйЗри╕ри╝рии риири╣рйАриВ риори┐ри▓рйАред риЖрикригри╛ риХрйЛриб ри╕ри╛риВриЭри╛ риХри░рйЛ риЬри╛риВ рижрйЛри╕рид рижри╛ риХрйЛриб ринри░рйЛред",
+        me: "риорйИриВ",
+        friend: "рижрйЛри╕рид",
+        enterFriendCode: "риХри┐ри░рикри╛ риХри░риХрйЗ рижрйЛри╕рид рижри╛ риХрйЛриб ринри░рйЛред",
+        ownCodeError: "риЗри╣ ридрйБри╣ри╛рибри╛ риЖрикригри╛ риХрйЛриб ри╣рйИ тАФ риХри┐ри╕рйЗ ри╣рйЛри░ рижри╛ риХрйЛриб ринри░рйЛред",
+        connectingTo: (code) => `риХрйЛриб ${code} риири╛ри▓ риЬрйЛрйЬри┐риЖ риЬри╛ ри░ри┐ри╣ри╛ ри╣рйИ...`,
+        liveTracking: (code) => `риХрйЛриб ${code} рижрйА ри▓ри╛риИри╡ ри▓рйЛриХрйЗри╕ри╝рии риЪрй▒ри▓ ри░ри╣рйА ри╣рйИред`,
+        waitingFor: (code) => `риХрйЛриб ${code} рижри╛ риЗрй░ридриЬри╝ри╛ри░ риХрйАридри╛ риЬри╛ ри░ри┐ри╣ри╛ ри╣рйИ...`,
+        myCodeReady: (code) => `ридрйБри╣ри╛рибри╛ риХрйЛриб ${code} ридри┐риЖри░ ри╣рйИред`,
+        loggedOutMsg: (code) => `ри▓рйМриЧ риЖриКриЯ ри╣рйЛ риЧри┐риЖред риири╡ри╛риВ риХрйЛриб ${code} ридри┐риЖри░ ри╣рйИред`,
+        fbReadError: (msg) => "Firebase рибри╛риЯри╛ рикрйЬрйНри╣рии ри╡ри┐рй▒риЪ рижри┐рй▒риХрид риЖриИ: " + msg,
+        fbSaveError: (msg) => "ри▓рйЛриХрйЗри╕ри╝рии ри╕рйЗри╡ риХри░рии ри╡ри┐рй▒риЪ рижри┐рй▒риХрид: " + msg,
+        gpsError: (msg) => "ри▓рйЛриХрйЗри╕ри╝рии рикри░риори┐ри╕ри╝рии риЬри╛риВ GPS римрй░риж ри╣рйИ: " + msg,
+        noGeo: "риЗри╕ рибри┐ри╡ри╛риИри╕ ри╡ри┐рй▒риЪ Geolocation ри╕рикрйЛри░риЯ риири╣рйАриВ ри╣рйИред"
+      },
+      hi: {
+        htmlLang: "hi",
+        myCodeLabel: "рдореЗрд░рд╛ рдХреЛрдб:",
+        satelliteBtn: "ЁЯЫ░я╕П рд╕реИрдЯреЗрд▓рд╛рдЗрдЯ",
+        streetBtn: "ЁЯЧ║я╕П рдореИрдк",
+        logoutBtn: "рд▓реЙрдЧ рдЖрдЙрдЯ",
+        logoutConfirm: "рдХреНрдпрд╛ рдЖрдк рд▓реЙрдЧ рдЖрдЙрдЯ рдХрд░рдХреЗ рдирдпрд╛ рдХреЛрдб рдмрдирд╛рдирд╛ рдЪрд╛рд╣рддреЗ рд╣реИрдВ?",
+        friendPlaceholder: "рджреЛрд╕реНрдд рдХрд╛ рдХреЛрдб рдбрд╛рд▓реЗрдВ (рдЬреИрд╕реЗ AB12CD)",
+        connectBtn: "рдЬреЛрдбрд╝реЗрдВ",
+        drawerTitle: "рдЬреБрдбрд╝реЗ рд╣реБрдП рдпреВрдЬрд╝рд░реНрд╕ рдХреА рд▓рд╛рдЗрд╡ рд▓реЛрдХреЗрд╢рди",
+        noUsers: "рдХреЛрдИ рдЬреБрдбрд╝реА рд╣реБрдИ рд▓реЛрдХреЗрд╢рди рдирд╣реАрдВ рдорд┐рд▓реАред рдЕрдкрдирд╛ рдХреЛрдб рд╢реЗрдпрд░ рдХрд░реЗрдВ рдпрд╛ рджреЛрд╕реНрдд рдХрд╛ рдХреЛрдб рдбрд╛рд▓реЗрдВред",
+        me: "рдореИрдВ",
+        friend: "рджреЛрд╕реНрдд",
+        enterFriendCode: "рдХреГрдкрдпрд╛ рджреЛрд╕реНрдд рдХрд╛ рдХреЛрдб рдбрд╛рд▓реЗрдВред",
+        ownCodeError: "рдпрд╣ рдЖрдкрдХрд╛ рдЕрдкрдирд╛ рдХреЛрдб рд╣реИ тАФ рдХрд┐рд╕реА рдФрд░ рдХрд╛ рдХреЛрдб рдбрд╛рд▓реЗрдВред",
+        connectingTo: (code) => `рдХреЛрдб ${code} рд╕реЗ рдЬреЛрдбрд╝рд╛ рдЬрд╛ рд░рд╣рд╛ рд╣реИ...`,
+        liveTracking: (code) => `рдХреЛрдб ${code} рдХреА рд▓рд╛рдЗрд╡ рд▓реЛрдХреЗрд╢рди рдЪрд▓ рд░рд╣реА рд╣реИред`,
+        waitingFor: (code) => `рдХреЛрдб ${code} рдХрд╛ рдЗрдВрддрдЬрд╝рд╛рд░ рдХрд┐рдпрд╛ рдЬрд╛ рд░рд╣рд╛ рд╣реИ...`,
+        myCodeReady: (code) => `рдЖрдкрдХрд╛ рдХреЛрдб ${code} рддреИрдпрд╛рд░ рд╣реИред`,
+        loggedOutMsg: (code) => `рд▓реЙрдЧ рдЖрдЙрдЯ рд╣реЛ рдЧрдпрд╛ред рдирдпрд╛ рдХреЛрдб ${code} рддреИрдпрд╛рд░ рд╣реИред`,
+        fbReadError: (msg) => "Firebase рдбреЗрдЯрд╛ рдкрдврд╝рдиреЗ рдореЗрдВ рд╕рдорд╕реНрдпрд╛ рдЖрдИ: " + msg,
+        fbSaveError: (msg) => "рд▓реЛрдХреЗрд╢рди рд╕реЗрд╡ рдХрд░рдиреЗ рдореЗрдВ рд╕рдорд╕реНрдпрд╛: " + msg,
+        gpsError: (msg) => "рд▓реЛрдХреЗрд╢рди рдкрд░рдорд┐рд╢рди рдпрд╛ GPS рдмрдВрдж рд╣реИ: " + msg,
+        noGeo: "рдЗрд╕ рдбрд┐рд╡рд╛рдЗрд╕ рдореЗрдВ Geolocation рд╕рдкреЛрд░реНрдЯ рдирд╣реАрдВ рд╣реИред"
+      },
+      en: {
+        htmlLang: "en",
+        myCodeLabel: "My Code:",
+        satelliteBtn: "ЁЯЫ░я╕П Satellite",
+        streetBtn: "ЁЯЧ║я╕П Map",
+        logoutBtn: "Logout",
+        logoutConfirm: "Do you want to logout and generate a new code?",
+        friendPlaceholder: "Enter friend's code (e.g. AB12CD)",
+        connectBtn: "Connect",
+        drawerTitle: "Connected Users Live Location",
+        noUsers: "No connected location found. Share your code or enter a friend's code.",
+        me: "Me",
+        friend: "Friend",
+        enterFriendCode: "Please enter a friend's code.",
+        ownCodeError: "That is your own code тАФ enter someone else's code.",
+        connectingTo: (code) => `Connecting to code ${code}...`,
+        liveTracking: (code) => `Live location active for code ${code}.`,
+        waitingFor: (code) => `Waiting for code ${code}...`,
+        myCodeReady: (code) => `Your code ${code} is ready.`,
+        loggedOutMsg: (code) => `Logged out. New code ${code} is ready.`,
+        fbReadError: (msg) => "Error reading Firebase data: " + msg,
+        fbSaveError: (msg) => "Error saving location: " + msg,
+        gpsError: (msg) => "Location permission denied or GPS off: " + msg,
+        noGeo: "Geolocation is not supported on this device."
+      }
+    };
+        let currentLang = localStorage.getItem("appLang") || "pa";
+    if (!translations[currentLang]) currentLang = "pa";
+
+    function t(key, ...args) {
+      const dict = translations[currentLang] || translations.pa;
+      const val = dict[key] ?? translations.pa[key];
+      return typeof val === "function" ? val(...args) : val;
+    }
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyApFPV_17-QvYbcXkkcdLeq68mE0p9u_a4",
+      authDomain: "live-trak-fea9f.firebaseapp.com",
+      databaseURL: "https://live-trak-fea9f-default-rtdb.firebaseio.com",
+      projectId: "live-trak-fea9f",
+      storageBucket: "live-trak-fea9f.firebasestorage.app",
+      messagingSenderId: "655968899644",
+      appId: "1:655968899644:web:ab0ccbfd8f8d0b6e4a80cc",
+      measurementId: "G-M8HXBT2D5C"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    const map = L.map("map").setView([25.2048, 55.2708], 11);
+
+    const streetLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "&copy; OpenStreetMap"
+    });
+
+    const satelliteLayer = L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      { attribution: "&copy; Esri Satellite" }
+    );
+
+    let isSatellite = false;
+    streetLayer.addTo(map);
+
+    const mapToggleBtn = document.getElementById("mapToggleBtn");
+    const logoutBtn = document.getElementById("logoutBtn");
+    const langSelect = document.getElementById("langSelect");
+    const myCodeLabelEl = document.getElementById("myCodeLabel");
+    const myCodeEl = document.getElementById("myCode");
+    const friendCodeInput = document.getElementById("friendCodeInput");
+    const connectBtn = document.getElementById("connectBtn");
+    const drawerTitleEl = document.getElementById("drawerTitle");
+    const userListEl = document.getElementById("userList");
+    const statusMsgEl = document.getElementById("statusMsg");
+
+    function updateMapToggleText() {
+      mapToggleBtn.textContent = isSatellite ? t("streetBtn") : t("satelliteBtn");
+    }
+
+    let latestUsersData = {};
+    let lastPos = null;
+
+    function applyLanguage() {
+      document.documentElement.lang = t("htmlLang");
+      myCodeLabelEl.textContent = t("myCodeLabel");
+      logoutBtn.textContent = t("logoutBtn");
+      friendCodeInput.placeholder = t("friendPlaceholder");
+      connectBtn.textContent = t("connectBtn");
+      drawerTitleEl.textContent = t("drawerTitle");
+      updateMapToggleText();
+      renderUsers(latestUsersData);
+      refreshStatusFromState(latestUsersData);
+    }
+
+    langSelect.value = currentLang;
+    langSelect.addEventListener("change", () => {
+      currentLang = langSelect.value;
+      localStorage.setItem("appLang", currentLang);
+      applyLanguage();
+    });
+
+    mapToggleBtn.addEventListener("click", () => {
+      if (!isSatellite) {
+        map.removeLayer(streetLayer);
+        satelliteLayer.addTo(map);
+        isSatellite = true;
+      } else {
+        map.removeLayer(satelliteLayer);
+        streetLayer.addTo(map);
+        isSatellite = false;
+      }
+      updateMapToggleText();
+    });
+        function generateCode() {
+      const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+      let code = "";
+      for (let i = 0; i < 6; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return code;
+    }
+
+    let myCode = localStorage.getItem("myTrackCode");
+    if (!myCode) {
+      myCode = generateCode();
+      localStorage.setItem("myTrackCode", myCode);
+    }
+
+    let pairedCode = (localStorage.getItem("pairedTrackCode") || "").toUpperCase();
+
+    myCodeEl.textContent = myCode;
+    friendCodeInput.value = pairedCode;
+
+    function setStatus(msg) {
+      statusMsgEl.textContent = msg;
+    }
+
+    function refreshStatusFromState(data) {
+      if (pairedCode && data && data[pairedCode]) {
+        setStatus(t("liveTracking", pairedCode));
+      } else if (pairedCode) {
+        setStatus(t("waitingFor", pairedCode));
+      } else {
+        setStatus(t("myCodeReady", myCode));
+      }
+    }
+
+    const markers = {};
+
+    function renderUsers(usersObj) {
+      userListEl.innerHTML = "";
+      const activeIds = [];
+
+      if (myCode && usersObj && usersObj[myCode]) {
+        activeIds.push(myCode);
+      }
+      if (pairedCode && pairedCode !== myCode && usersObj && usersObj[pairedCode]) {
+        activeIds.push(pairedCode);
+      }
+
+      if (activeIds.length === 0) {
+        userListEl.innerHTML = `<div class="user-card"><div>${t("noUsers")}</div></div>`;
+      } else {
+        activeIds.forEach((id) => {
+          const u = usersObj[id];
+          if (!u || typeof u.lat !== "number" || typeof u.lng !== "number") return;
+
+          const speedKmh = typeof u.speed === "number" && u.speed >= 0
+            ? (u.speed * 3.6).toFixed(1)
+            : "0.0";
+
+          const label = id === myCode ? `${t("me")} (${id})` : `${t("friend")} (${id})`;
+
+          const card = document.createElement("div");
+          card.className = "user-card";
+          card.innerHTML = `
+            <div class="user-meta">
+              <strong>${label}</strong>
+              <small>${u.lat.toFixed(5)}, ${u.lng.toFixed(5)}</small>
+            </div>
+            <div class="speed-badge">${speedKmh} km/h</div>
+          `;
+          card.addEventListener("click", () => {
+            map.setView([u.lat, u.lng], 15);
+          });
+          userListEl.appendChild(card);
+
+          if (!markers[id]) {
+            markers[id] = L.marker([u.lat, u.lng]).addTo(map).bindPopup(label);
+          } else {
+            markers[id].setLatLng([u.lat, u.lng]).bindPopup(label);
+          }
+        });
+      }
+
+      Object.keys(markers).forEach((id) => {
+        if (!activeIds.includes(id)) {
+          map.removeLayer(markers[id]);
+          delete markers[id];
+        }
+      });
+    }
+
+    connectBtn.addEventListener("click", () => {
+      const code = friendCodeInput.value.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+      friendCodeInput.value = code;
+      if (!code) {
+        setStatus(t("enterFriendCode"));
+        return;
+      }
+      if (code === myCode) {
+        setStatus(t("ownCodeError"));
+        return;
+      }
+      pairedCode = code;
+      localStorage.setItem("pairedTrackCode", pairedCode);
+      update(ref(db, `users/${myCode}`), { pairedWith: pairedCode }).catch(() => {});
+      setStatus(t("connectingTo", pairedCode));
+      renderUsers(latestUsersData);
+    });
+
+    logoutBtn.addEventListener("click", async () => {
+      if (!confirm(t("logoutConfirm"))) return;
+
+      const oldCode = myCode;
+      if (oldCode) {
+        try {
+          await remove(ref(db, `users/${oldCode}`));
+        } catch (_) {}
+      }
+
+      const newCode = generateCode();
+      myCode = newCode;
+      pairedCode = "";
+
+      localStorage.setItem("myTrackCode", myCode);
+      localStorage.removeItem("pairedTrackCode");
+
+      myCodeEl.textContent = myCode;
+      friendCodeInput.value = "";
+
+      if (lastPos) {
+        const { latitude, longitude, speed, heading } = lastPos.coords;
+        set(ref(db, `users/${myCode}`), {
+          lat: latitude,
+          lng: longitude,
+          speed: speed ?? 0,
+          heading: heading ?? 0,
+          pairedWith: "",
+          updatedAt: Date.now()
+        }).catch(() => {});
+      }
+
+      renderUsers(latestUsersData);
+      setStatus(t("loggedOutMsg", myCode));
+    });
+
+    onValue(
+      ref(db, "users"),
+      (snapshot) => {
+        const data = snapshot.val() || {};
+        latestUsersData = data;
+        renderUsers(data);
+        refreshStatusFromState(data);
+      },
+      (err) => {
+        setStatus(t("fbReadError", err.message));
+      }
+    );
+
+    if ("geolocation" in navigator) {
+      navigator.geolocation.watchPosition(
+        (pos) => {
+          lastPos = pos;
+          const { latitude, longitude, speed, heading } = pos.coords;
+          set(ref(db, `users/${myCode}`), {
+            lat: latitude,
+            lng: longitude,
+            speed: speed ?? 0,
+            heading: heading ?? 0,
+            pairedWith: pairedCode || "",
+            updatedAt: Date.now()
+          }).catch((err) => {
+            setStatus(t("fbSaveError", err.message));
+          });
+        },
+        (err) => {
+          setStatus(t("gpsError", err.message));
+        },
+        {
+          enableHighAccuracy: true,
+          maximumAge: 2000,
+          timeout: 10000
+        }
+      );
+    } else {
+      setStatus(t("noGeo"));
+    }
+
+    applyLanguage();
+  </script>
+</body>
+</html>
